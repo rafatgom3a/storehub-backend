@@ -1,14 +1,12 @@
 import { Router } from 'express';
-import { getProductById, getProducts } from '../services/dummyJsonService.js';
+import { createProduct, deleteProduct, getProductById, getProducts, updateProduct } from '../controllers/productController.js';
+import { requireAdmin, requireAuth } from '../middleware/auth.js';
+
 const router = Router();
-router.get('/', async (req, res, next) => {
-  try {
-    const data = await getProducts({ limit: req.query.limit, skip: req.query.skip, category: req.query.category });
-    res.json(data);
-  } catch (error) { next(error); }
-});
-router.get('/:id', async (req, res, next) => {
-  try { res.json(await getProductById(req.params.id)); }
-  catch (error) { next(error); }
-});
+router.get('/', getProducts);
+router.get('/:id', getProductById);
+router.post('/', requireAuth, requireAdmin, createProduct);
+router.put('/:id', requireAuth, requireAdmin, updateProduct);
+router.patch('/:id', requireAuth, requireAdmin, updateProduct);
+router.delete('/:id', requireAuth, requireAdmin, deleteProduct);
 export default router;

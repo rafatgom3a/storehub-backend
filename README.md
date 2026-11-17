@@ -1,49 +1,41 @@
-# StoreHub Backend (starter)
+# StoreHub Backend
 
-Node.js + Express + MongoDB starter for the uploaded StoreHub React frontend.
-
-## Included
-- MongoDB connection with Mongoose
-- `GET /api/health`
-- `GET /api/products` and `GET /api/products/:id` (temporary server-side proxy to DummyJSON)
-- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
-- `POST /api/contact` (stores contact messages in MongoDB)
-- Basic security middleware: Helmet, CORS, rate limiting, password hashing, JWT authentication
-
-## Requirements
-- Node.js 20 LTS or newer
-- MongoDB local service, or a MongoDB Atlas connection string
+Node.js + Express + MongoDB REST API for StoreHub.
 
 ## Setup
-1. Copy `.env.example` to `.env`.
-2. Set `MONGODB_URI` and replace `JWT_SECRET` with a long random secret.
-3. Set `CLIENT_URL` to your Vite frontend origin (usually `http://localhost:5173`).
-4. Run `npm install`.
-5. Run `npm run dev`.
-6. Open `http://localhost:5000/api/health`.
+1. Install Node.js LTS and MongoDB (local or Atlas).
+2. Run `npm install`.
+3. Copy `.env.example` to `.env` and set `MONGODB_URI`, `JWT_SECRET`, and `CLIENT_URL`.
+4. Run `npm run dev`.
+5. Health check: `GET http://localhost:5000/api/health`.
 
-## Test endpoints
-```bash
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/products?limit=10
-curl http://localhost:5000/api/products/1
+## Product API
+- `GET /api/products` — list products. Query parameters: `page`, `limit`, `search`, `category` (comma-separated slugs), `minPrice`, `maxPrice`, `minRating`, `sort` (`priceLow`, `priceHigh`, `ratingHigh`, `newest`), `featured=true`.
+- `GET /api/products/:id` — product details.
+- `POST /api/products` — create (admin only).
+- `PUT/PATCH /api/products/:id` — update (admin only).
+- `DELETE /api/products/:id` — delete (admin only).
+
+Product JSON fields include `title`, `description`, `category` (category slug), `price`, `discountPercentage`, `rating`, `stock`, `thumbnail`, `images`, `brand`, `sku`, `weight`, `dimensions`, `warrantyInformation`, `shippingInformation`, `availabilityStatus`, `returnPolicy`, `minimumOrderQuantity`, `reviews`, `meta`, `isFeatured`, and `isActive`.
+
+## Category API
+- `GET /api/categories` — list active categories.
+- `GET /api/categories/:idOrSlug` — category details.
+- `POST /api/categories` — create (admin only). Body: `{ "name": "Electronics", "description": "...", "image": "https://..." }`. Slug is generated from the name unless supplied.
+- `PUT/PATCH /api/categories/:id` — update (admin only).
+- `DELETE /api/categories/:id` — delete (admin only); deletion is blocked while products use the category.
+
+## Admin access
+Write operations are protected. Register a normal account using `/api/auth/register`, then promote that account once in MongoDB Compass or mongosh:
+
+```js
+use storehub
+db.users.updateOne({ email: "admin@example.com" }, { $set: { role: "admin" } })
 ```
 
-Register:
-```bash
-curl -X POST http://localhost:5000/api/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Test User","email":"test@example.com","password":"password123"}'
-```
+Log in with that account and send `Authorization: Bearer YOUR_JWT_TOKEN` for product/category write requests. Never expose the token or `.env` values.
 
-Contact form:
-```bash
-curl -X POST http://localhost:5000/api/contact \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Test User","email":"test@example.com","message":"Hello StoreHub"}'
-```
+## React frontend
+The companion `frontend/src` folder in the full-stack update ZIP is wired to this API. In your existing Vite frontend, set `VITE_API_URL=http://localhost:5000/api`, install/retain `axios`, then copy the provided `frontend/src` folder over your existing `src` folder.
 
-## Connect the React frontend
-Create `VITE_API_URL=http://localhost:5000/api` in the frontend `.env` and use it as the base URL for Axios. Do not put database credentials or JWT secrets in the Vite environment; variables prefixed with `VITE_` are exposed to browsers.
-
-The current frontend's cart still uses localStorage. The next implementation step is to add persistent carts and orders, then update `CartContext` to call authenticated backend endpoints. The products endpoint currently proxies DummyJSON so the existing UI can be migrated gradually; it is not yet a locally managed product catalog.
+The API starts with an empty product/category collection. Create categories first, then products using their category slugs. DummyJSON is no longer used.
