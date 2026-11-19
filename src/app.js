@@ -8,7 +8,12 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 
 const app = express();
+
+// Trust Vercel's reverse proxy
+app.set('trust proxy', 1);
+
 app.use(helmet());
+
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map(origin => origin.trim());
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '1mb' }));
