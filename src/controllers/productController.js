@@ -18,7 +18,7 @@ export async function getProducts(req, res, next) {
   try {
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 9));
-    const filter = { isActive: true };
+    const filter = { isActive: { $ne: false }, is_active: { $ne: false } };
     if (req.query.search?.trim()) {
       const term = new RegExp(escapeRegex(req.query.search.trim()), 'i');
       filter.$or = [{ title: term }, { description: term }, { brand: term }];
@@ -50,7 +50,7 @@ export async function getProducts(req, res, next) {
 export async function getProductById(req, res, next) {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Product not found' });
-    const product = await Product.findOne({ _id: req.params.id, isActive: true }).lean({ virtuals: true });
+    const product = await Product.findOne({ _id: req.params.id, isActive: { $ne: false }, is_active: { $ne: false } }).lean({ virtuals: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) { next(error); }

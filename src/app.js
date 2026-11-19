@@ -6,6 +6,7 @@ import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
+import { connectDatabase } from './config/database.js';
 
 const app = express();
 
@@ -18,7 +19,27 @@ const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-8', legacyHeaders: false }));
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'StoreHub API' }));
+
+// Vercel serverless functions may import app.js without running server.js.
+// Ensure MongoDB is connected before every API handler (including health).
+app.use('/api', async (_req, res, next) => {
+  try {
+    await connectDatabase();
+    next();
+  } catch (error) {
+    console.error('[MongoDB connection failed]', error);
+    res.status(503).json({
+      message: 'Database unavailable. Check the backend MongoDB connection.',
+      code: 'DATABASE_UNAVAILABLE',
+    });
+  }
+});
+
+app.get('/api/health', (_req, res) => res.json({
+  status: 'ok',
+  service: 'StoreHub API',
+  database: 'connected',
+}));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);

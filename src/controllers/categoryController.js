@@ -7,7 +7,7 @@ const slugify = value => String(value || '').trim().toLowerCase()
 
 export async function getCategories(_req, res, next) {
   try {
-    const categories = await Category.find({ isActive: true }).sort({ name: 1 }).lean({ virtuals: true });
+    const categories = await Category.find({ isActive: { $ne: false }, is_active: { $ne: false } }).sort({ name: 1 }).lean({ virtuals: true });
     res.json({ categories });
   } catch (error) { next(error); }
 }
@@ -15,7 +15,7 @@ export async function getCategories(_req, res, next) {
 export async function getCategoryById(req, res, next) {
   try {
     const query = mongoose.isValidObjectId(req.params.id) ? { _id: req.params.id } : { slug: req.params.id.toLowerCase() };
-    const category = await Category.findOne({ ...query, isActive: true }).lean({ virtuals: true });
+    const category = await Category.findOne({ ...query, isActive: { $ne: false }, is_active: { $ne: false } }).lean({ virtuals: true });
     if (!category) return res.status(404).json({ message: 'Category not found' });
     res.json(category);
   } catch (error) { next(error); }
