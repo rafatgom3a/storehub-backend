@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 function publicUser(user) {
-  return { id: user._id, name: user.name, email: user.email, role: user.role };
+  return { id: user._id, name: user.name, email: user.email, phone: user.phone || '', role: user.role };
 }
 
 function createToken(user) {
@@ -14,22 +14,33 @@ function createToken(user) {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const sudanPhonePattern = /^(?:\+249|00249|0)?[19][0-9]{8}$/;
+function normalizeSudanPhone(value) {
+  const phone = String(value || '').replace(/[\s()-]/g, '');
+  if (phone.startsWith('+')) return phone;
+  if (phone.startsWith('00249')) return `+${phone.slice(2)}`;
+  if (phone.startsWith('0')) return `+249${phone.slice(1)}`;
+  return `+249${phone}`;
+}
 
 export async function register(req, res, next) {
   try {
     const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const { password } = req.body;
+    const rawPhone = typeof req.body.phone === 'string' ? req.body.phone : '';
+    const phoneDigits = rawPhone.replace(/[\s()-]/g, '');
 
-    if (!name || name.length > 80) return res.status(400).json({ message: 'Name is required and must be 80 characters or fewer.' });
+    if (name.length < 2 || name.length > 80) return res.status(400).json({ message: 'Name must be between 2 and 80 characters.' });
     if (!emailPattern.test(email) || email.length > 254) return res.status(400).json({ message: 'Please provide a valid email address.' });
+    if (!sudanPhonePattern.test(phoneDigits) || phoneDigits.length > 16) return res.status(400).json({ message: 'Please provide a valid Sudanese mobile number.' });
     if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
       return res.status(400).json({ message: 'Password must be between 8 and 128 characters.' });
     }
     if (await User.exists({ email })) return res.status(409).json({ message: 'An account with this email already exists.' });
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ name, email, passwordHash });
+    const user = await User.create({ name, email, phone: normalizeSudanPhone(rawPhone), passwordHash });
     return res.status(201).json({ token: createToken(user), user: publicUser(user) });
   } catch (error) { next(error); }
 }
@@ -38,7 +49,7 @@ export async function login(req, res, next) {
   try {
     const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const { password } = req.body;
-    if (!email || typeof password !== 'string' || !password) {
+    if (!emailPattern.test(email) || email.length > 254 || typeof password !== 'string' || password.length < 8 || password.length > 128) {
       return res.status(400).json({ message: 'Email and password are required.' });
     }
     const user = await User.findOne({ email }).select('+passwordHash');
@@ -52,3 +63,18 @@ export async function login(req, res, next) {
 export function me(req, res) {
   return res.json({ user: publicUser(req.user) });
 }
+
+export async function updateMe(req, res, next) {
+  try {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const rawPhone = typeof req.body.phone === 'string' ? req.body.phone : '';
+    const phoneDigits = rawPhone.replace(/[\s()-]/g, '');
+    if (name.length < 2 || name.length > 80) return res.status(400).json({ message: 'Name must be between 2 and 80 characters.' });
+    if (!sudanPhonePattern.test(phoneDigits) || phoneDigits.length > 16) return res.status(400).json({ message: 'Please provide a valid Sudanese mobile number.' });
+    req.user.name = name;
+    req.user.phone = normalizeSudanPhone(rawPhone);
+    await req.user.save();
+    return res.json({ user: publicUser(req.user) });
+  } catch (error) { next(error); }
+}
+
